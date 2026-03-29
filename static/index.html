@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Backup Service</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <span class="logo">&#9632;</span>
+      <h1>BACKUP SERVICE</h1>
+    </div>
+    <div class="header-right">
+      <span id="ws-status" class="ws-dot disconnected"></span>
+      <span id="ws-label">Connecting&hellip;</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="layout">
+
+      <!-- ── LEFT: CONTENT AREA ───────────────────────── -->
+      <div class="content-area">
+
+        <!-- STATUS -->
+        <section class="card full-width">
+          <div class="card-header">
+            <h2>STATUS</h2>
+            <span id="status-badge" class="badge">IDLE</span>
+          </div>
+          <div id="progress-wrap" class="progress-wrap">
+            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+            <div class="progress-stats">
+              <span id="stat-files">0 / 0 files</span>
+              <span id="stat-bytes">0 B / 0 B</span>
+              <span id="stat-speed">&mdash;</span>
+              <span id="stat-elapsed">&mdash;</span>
+            </div>
+            <div class="progress-current" id="current-file">&nbsp;</div>
+          </div>
+          <div class="status-footer">
+            <div class="status-meta">
+              <span>Last backup: <strong id="last-run">never</strong></span>
+              <span>Next scheduled: <strong id="next-run">&mdash;</strong></span>
+            </div>
+            <div class="status-actions">
+              <button id="btn-run" class="btn btn-accent" onclick="startBackup()">Run Now</button>
+              <div id="backup-active" class="backup-active" style="display:none">
+                <span class="pulse-dot"></span>
+                <span id="inline-phase">Scanning&hellip;</span>
+                <div class="inline-bar"><div class="inline-fill" id="inline-fill"></div></div>
+                <button class="btn btn-sm btn-muted" onclick="cancelBackup()">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SOURCES -->
+        <section class="card">
+          <div class="card-header"><h2>SOURCES</h2></div>
+          <ul id="source-list" class="path-list"></ul>
+          <div class="add-row">
+            <input id="src-path" type="text" placeholder="e.g. C:\Users\me\Documents" class="path-input" />
+            <input id="src-label" type="text" placeholder="Label (optional)" class="label-input" />
+            <div class="row-btns">
+              <button class="btn btn-sm btn-muted" onclick="browseSource()">Browse</button>
+              <button class="btn btn-sm" onclick="addSource()">+ Add</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- DESTINATIONS -->
+        <section class="card">
+          <div class="card-header"><h2>DESTINATIONS</h2></div>
+          <ul id="dest-list" class="path-list"></ul>
+          <div class="add-row">
+            <input id="dst-path" type="text" placeholder="e.g. \\NAS\backup" class="path-input" />
+            <input id="dst-label" type="text" placeholder="Label (optional)" class="label-input" />
+            <div class="row-btns">
+              <button class="btn btn-sm btn-muted" onclick="browseDest()">Browse</button>
+              <button class="btn btn-sm" onclick="addDest()">+ Add</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- SETTINGS -->
+        <section class="card full-width">
+          <div class="card-header"><h2>SETTINGS</h2></div>
+          <div class="settings-grid">
+            <div class="setting">
+              <label>Frequency</label>
+              <div class="setting-inline">
+                every
+                <input id="set-freq" type="number" min="1" max="90" value="1" class="num-input" />
+                day(s)
+              </div>
+            </div>
+            <div class="setting">
+              <label>Backup time</label>
+              <div class="setting-inline">
+                <input id="set-hour" type="number" min="0" max="23" value="2" class="num-input" />
+                <span class="time-sep">:</span>
+                <input id="set-min" type="number" min="0" max="59" value="0" class="num-input" />
+              </div>
+            </div>
+            <div class="setting">
+              <label>Keep backups</label>
+              <div class="setting-inline">
+                <input id="set-retention" type="range" min="2" max="5" value="3"
+                       oninput="document.getElementById('ret-val').textContent=this.value" />
+                <span id="ret-val">3</span>
+              </div>
+            </div>
+            <div class="setting">
+              <label>Scheduler</label>
+              <label class="toggle">
+                <input id="set-enabled" type="checkbox" checked />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+            <div class="setting setting-action">
+              <button class="btn" onclick="saveSettings()">Save Settings</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- HISTORY -->
+        <section class="card full-width">
+          <div class="card-header"><h2>HISTORY</h2></div>
+          <div class="table-wrap">
+            <table id="history-table">
+              <thead>
+                <tr>
+                  <th>Started</th>
+                  <th>Status</th>
+                  <th>Files</th>
+                  <th>Size</th>
+                  <th>Skipped</th>
+                  <th>Failed</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <p id="history-empty" class="empty-msg">No backup history yet.</p>
+          </div>
+        </section>
+
+      </div><!-- /content-area -->
+
+      <!-- ── RIGHT: LOGS PANEL ────────────────────────── -->
+      <aside class="log-panel">
+        <section class="card log-card">
+          <div class="card-header">
+            <h2>LOGS</h2>
+            <div class="log-controls">
+              <select id="log-filter" onchange="applyLogFilter()">
+                <option value="all">All</option>
+                <option value="info">Info</option>
+                <option value="warning">Warnings</option>
+                <option value="error">Errors</option>
+              </select>
+              <button class="btn btn-sm btn-muted" onclick="clearLogs()">Clear</button>
+            </div>
+          </div>
+          <div class="log-viewer" id="log-viewer"></div>
+        </section>
+      </aside>
+
+    </div><!-- /layout -->
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
