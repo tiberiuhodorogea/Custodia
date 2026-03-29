@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import threading
@@ -6,6 +7,8 @@ from datetime import datetime
 from collections import deque
 
 import database as db
+
+log = logging.getLogger(__name__)
 
 
 class BackupState:
@@ -181,6 +184,7 @@ def run_backup():
 
     run_id = db.create_run()
     state.run_id = run_id
+    log.info("Backup run #%d started", run_id)
     _log(run_id, "info", "Backup started")
 
     try:
@@ -310,8 +314,15 @@ def run_backup():
             bytes_copied=state.bytes_copied,
             error_message=err,
         )
+        if status == "completed":
+            log.info("Backup run #%d completed: %d files, %s",
+                     run_id, state.files_copied, _fmt_bytes(state.bytes_copied))
+        else:
+            log.warning("Backup run #%d completed with warnings: %s",
+                        run_id, err)
 
     except Exception as exc:
+        log.exception("Backup run #%d failed with unhandled exception", run_id)
         _log(run_id, "error", f"Backup failed: {exc}")
         db.complete_run(run_id, "failed", error_message=str(exc))
     finally:

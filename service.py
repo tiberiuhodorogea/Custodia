@@ -29,6 +29,24 @@ LOG_DIR  = os.path.join(SERVICE_DIR, "logs")
 LOG_FILE = os.path.join(LOG_DIR, "service.log")
 
 
+class _NoiseFilter(logging.Filter):
+    """Drop high-frequency uvicorn noise that would flood the log file:
+    - uvicorn.access : every HTTP request
+    - uvicorn.error  : per-WebSocket-connection open/close messages
+    """
+    _WS_NOISE = ("connection open", "connection closed")
+
+    def filter(self, record):
+        if record.name.startswith("uvicorn.access"):
+            return False
+        if record.name == "uvicorn.error":
+            msg = record.getMessage()
+            # WebSocket per-connection lines look like "('ip', port) - WS [accepted]"
+            if msg.startswith("('") or msg in self._WS_NOISE:
+                return False
+        return True
+
+
 def _setup_logging():
     """Configure a rotating file logger shared by the service and the app."""
     os.makedirs(LOG_DIR, exist_ok=True)
@@ -47,12 +65,11 @@ def _setup_logging():
         "%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     ))
+    handler.addFilter(_NoiseFilter())
     root.setLevel(logging.INFO)
     root.addHandler(handler)
 
-    # Silence loggers that would flood the file with routine noise
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+    # Silence APScheduler routine chatter (job execution ticks etc.)
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
 
 

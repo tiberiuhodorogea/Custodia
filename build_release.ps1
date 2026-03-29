@@ -186,15 +186,17 @@ echo [%TIME%] Files copied to %INSTALL_DIR% >> "%LOGFILE%"
 echo   Registering Windows Service...
 echo [%TIME%] Registering Windows Service >> "%LOGFILE%"
 "%INSTALL_DIR%\python\python.exe" "%INSTALL_DIR%\service.py" install >> "%LOGFILE%" 2>&1
+:: Verify via sc query - more reliable than pywin32 exit code
+sc query BackupService >nul 2>&1
 if %errorlevel% neq 0 (
     echo   ERROR: Service registration failed.
     echo   Check: %LOGFILE%
-    echo [%TIME%] ERROR: Service registration failed (see above) >> "%LOGFILE%"
+    echo [%TIME%] ERROR: Service not found after install attempt >> "%LOGFILE%"
     echo.
     pause
     exit /b 1
 )
-echo [%TIME%] Service registered successfully >> "%LOGFILE%"
+echo [%TIME%] Service registered and verified >> "%LOGFILE%"
 
 :: -- Ensure auto-start on boot --------------------------------------------
 sc config BackupService start= auto >nul
