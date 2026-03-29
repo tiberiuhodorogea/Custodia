@@ -70,7 +70,6 @@ function connectWS() {
 function renderState(s) {
   const badge = document.getElementById('status-badge');
   const fill  = document.getElementById('progress-fill');
-  const wrap  = document.getElementById('progress-wrap');
 
   // Badge
   let label = 'IDLE';
@@ -83,12 +82,11 @@ function renderState(s) {
   badge.className = 'badge ' + cls;
 
   // Button / inline progress toggle
-  const btnRun      = document.getElementById('btn-run');
+  const btnRun       = document.getElementById('btn-run');
   const backupActive = document.getElementById('backup-active');
   const pct = s.bytes_total > 0 ? (s.bytes_copied / s.bytes_total) * 100 : 0;
 
   if (s.running) {
-    wrap.style.display = '';
     btnRun.style.display = 'none';
     backupActive.style.display = 'flex';
     const phases = { scanning: 'Scanning files…', copying: 'Copying…', cleaning: 'Cleaning up…' };
@@ -100,15 +98,27 @@ function renderState(s) {
     backupActive.style.display = 'none';
   }
 
-  // Progress bar
-  fill.style.width = pct.toFixed(1) + '%';
-
-  // Stats
-  document.getElementById('stat-files').textContent = `${s.files_copied} / ${s.files_total} files`;
-  document.getElementById('stat-bytes').textContent = `${fmtBytes(s.bytes_copied)} / ${fmtBytes(s.bytes_total)}`;
-  document.getElementById('stat-speed').textContent = s.speed_bps > 0 ? fmtBytes(s.speed_bps) + '/s' : '—';
-  document.getElementById('stat-elapsed').textContent = fmtDuration(s.elapsed_seconds);
-  document.getElementById('current-file').textContent = s.current_file || '\u00A0';
+  // Stats — show live values while running, reset to dashes when idle
+  if (s.running) {
+    const eta = s.speed_bps > 0 && s.bytes_total > s.bytes_copied
+      ? Math.round((s.bytes_total - s.bytes_copied) / s.speed_bps)
+      : 0;
+    fill.style.width = pct.toFixed(1) + '%';
+    document.getElementById('stat-files').textContent   = `${s.files_copied} / ${s.files_total} files`;
+    document.getElementById('stat-bytes').textContent   = `${fmtBytes(s.bytes_copied)} / ${fmtBytes(s.bytes_total)}`;
+    document.getElementById('stat-speed').textContent   = s.speed_bps > 0 ? fmtBytes(s.speed_bps) + '/s' : '—';
+    document.getElementById('stat-elapsed').textContent = fmtDuration(s.elapsed_seconds);
+    document.getElementById('stat-eta').textContent     = eta > 0 ? 'ETA ' + fmtDuration(eta) : '—';
+    document.getElementById('current-file').textContent = s.current_file || '\u00A0';
+  } else {
+    fill.style.width = '0%';
+    document.getElementById('stat-files').textContent   = '—';
+    document.getElementById('stat-bytes').textContent   = '—';
+    document.getElementById('stat-speed').textContent   = '—';
+    document.getElementById('stat-elapsed').textContent = '—';
+    document.getElementById('stat-eta').textContent     = '—';
+    document.getElementById('current-file').textContent = '\u00A0';
+  }
 
   // Meta
   if (s.last_run_time) document.getElementById('last-run').textContent = fmtTime(s.last_run_time);
@@ -141,17 +151,15 @@ async function loadSources()  { renderPathList(await api('GET', '/api/sources'),
 async function loadDests()    { renderPathList(await api('GET', '/api/destinations'),  'dest-list',   'dst'); }
 
 /* ── Folder browser modal ──────────────────────────── */
-let _browseTarget  = null;
+let _browseMode    = null;  // 'source' | 'dest'
 let _browseCurrent = '';
 
-window.browseSource = () => _openBrowse('src-path');
-window.browseDest   = () => _openBrowse('dst-path');
+window.browseSource = () => { _browseMode = 'source'; _openBrowse(); };
+window.browseDest   = () => { _browseMode = 'dest';   _openBrowse(); };
 
-function _openBrowse(targetId) {
-  _browseTarget = document.getElementById(targetId);
-  const seed = _browseTarget.value.trim();
+function _openBrowse() {
   _showBrowseModal(true);
-  _browseTo(seed);
+  _browseTo('');
 }
 
 function _showBrowseModal(visible) {
@@ -161,8 +169,16 @@ function _showBrowseModal(visible) {
 
 window.closeBrowseModal = () => _showBrowseModal(false);
 
-window.confirmBrowse = function() {
-  if (_browseTarget && _browseCurrent) _browseTarget.value = _browseCurrent;
+window.confirmBrowse = async function() {
+  if (_browseCurrent) {
+    if (_browseMode === 'source') {
+      await api('POST', '/api/sources', { path: _browseCurrent, label: '' });
+      loadSources();
+    } else if (_browseMode === 'dest') {
+      await api('POST', '/api/destinations', { path: _browseCurrent, label: '' });
+      loadDests();
+    }
+  }
   _showBrowseModal(false);
 };
 
@@ -209,25 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-async function addSource() {
-  const path = document.getElementById('src-path').value.trim();
-  if (!path) return;
-  const label = document.getElementById('src-label').value.trim();
-  await api('POST', '/api/sources', { path, label });
-  document.getElementById('src-path').value = '';
-  document.getElementById('src-label').value = '';
-  loadSources();
-}
-
-async function addDest() {
-  const path = document.getElementById('dst-path').value.trim();
-  if (!path) return;
-  const label = document.getElementById('dst-label').value.trim();
-  await api('POST', '/api/destinations', { path, label });
-  document.getElementById('dst-path').value = '';
-  document.getElementById('dst-label').value = '';
-  loadDests();
-}
 
 /* global */ window.srcToggle = async (id, en) => { await api('PATCH', `/api/sources/${id}`, { enabled: en }); loadSources(); };
 /* global */ window.srcRemove = async (id) => { await api('DELETE', `/api/sources/${id}`); loadSources(); };
@@ -235,6 +232,13 @@ async function addDest() {
 /* global */ window.dstRemove = async (id) => { await api('DELETE', `/api/destinations/${id}`); loadDests(); };
 
 /* ── Settings ──────────────────────────────────────── */
+function _applySchedulerState() {
+  const on = document.getElementById('set-enabled').checked;
+  ['set-freq', 'set-hour', 'set-min', 'set-retention'].forEach(id => {
+    document.getElementById(id).disabled = !on;
+  });
+}
+
 async function loadSettings() {
   const s = await api('GET', '/api/settings');
   document.getElementById('set-freq').value      = s.frequency_days || 1;
@@ -244,6 +248,7 @@ async function loadSettings() {
   document.getElementById('set-retention').value = s.retention_count || 3;
   document.getElementById('ret-val').textContent = s.retention_count || 3;
   document.getElementById('set-enabled').checked = s.scheduler_enabled === 'true';
+  _applySchedulerState();
 }
 
 async function saveSettings() {
@@ -255,9 +260,13 @@ async function saveSettings() {
     retention_count:   parseInt(document.getElementById('set-retention').value, 10),
     scheduler_enabled: document.getElementById('set-enabled').checked,
   });
-  loadSettings();
 }
 window.saveSettings = saveSettings;
+
+window.onSchedulerChange = function() {
+  _applySchedulerState();
+  saveSettings();
+};
 
 /* ── Backup control ────────────────────────────────── */
 function _showRunning(phase) {

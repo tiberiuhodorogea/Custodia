@@ -33,10 +33,11 @@
           <div id="progress-wrap" class="progress-wrap">
             <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
             <div class="progress-stats">
-              <span id="stat-files">0 / 0 files</span>
-              <span id="stat-bytes">0 B / 0 B</span>
+              <span id="stat-files">&mdash;</span>
+              <span id="stat-bytes">&mdash;</span>
               <span id="stat-speed">&mdash;</span>
               <span id="stat-elapsed">&mdash;</span>
+              <span id="stat-eta">&mdash;</span>
             </div>
             <div class="progress-current" id="current-file">&nbsp;</div>
           </div>
@@ -62,12 +63,7 @@
           <div class="card-header"><h2>SOURCES</h2></div>
           <ul id="source-list" class="path-list"></ul>
           <div class="add-row">
-            <input id="src-path" type="text" placeholder="e.g. C:\Users\me\Documents" class="path-input" />
-            <input id="src-label" type="text" placeholder="Label (optional)" class="label-input" />
-            <div class="row-btns">
-              <button class="btn btn-sm btn-muted" onclick="browseSource()">Browse</button>
-              <button class="btn btn-sm" onclick="addSource()">+ Add</button>
-            </div>
+            <button class="btn btn-sm" onclick="browseSource()">+ Add Source</button>
           </div>
         </section>
 
@@ -76,12 +72,7 @@
           <div class="card-header"><h2>DESTINATIONS</h2></div>
           <ul id="dest-list" class="path-list"></ul>
           <div class="add-row">
-            <input id="dst-path" type="text" placeholder="e.g. \\NAS\backup" class="path-input" />
-            <input id="dst-label" type="text" placeholder="Label (optional)" class="label-input" />
-            <div class="row-btns">
-              <button class="btn btn-sm btn-muted" onclick="browseDest()">Browse</button>
-              <button class="btn btn-sm" onclick="addDest()">+ Add</button>
-            </div>
+            <button class="btn btn-sm" onclick="browseDest()">+ Add Destination</button>
           </div>
         </section>
 
@@ -90,38 +81,36 @@
           <div class="card-header"><h2>SETTINGS</h2></div>
           <div class="settings-grid">
             <div class="setting">
+              <label>Scheduler</label>
+              <label class="toggle">
+                <input id="set-enabled" type="checkbox" checked onchange="onSchedulerChange()" />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+            <div class="setting">
               <label>Frequency</label>
               <div class="setting-inline">
                 every
-                <input id="set-freq" type="number" min="1" max="90" value="1" class="num-input" />
+                <input id="set-freq" type="number" min="1" max="90" value="1" class="num-input" onchange="saveSettings()" />
                 day(s)
               </div>
             </div>
             <div class="setting">
               <label>Backup time</label>
               <div class="setting-inline">
-                <input id="set-hour" type="number" min="0" max="23" value="2" class="num-input" />
+                <input id="set-hour" type="number" min="0" max="23" value="2" class="num-input" onchange="saveSettings()" />
                 <span class="time-sep">:</span>
-                <input id="set-min" type="number" min="0" max="59" value="0" class="num-input" />
+                <input id="set-min" type="number" min="0" max="59" value="0" class="num-input" onchange="saveSettings()" />
               </div>
             </div>
             <div class="setting">
               <label>Keep backups</label>
               <div class="setting-inline">
                 <input id="set-retention" type="range" min="2" max="5" value="3"
-                       oninput="document.getElementById('ret-val').textContent=this.value" />
+                       oninput="document.getElementById('ret-val').textContent=this.value"
+                       onchange="saveSettings()" />
                 <span id="ret-val">3</span>
               </div>
-            </div>
-            <div class="setting">
-              <label>Scheduler</label>
-              <label class="toggle">
-                <input id="set-enabled" type="checkbox" checked />
-                <span class="toggle-track"></span>
-              </label>
-            </div>
-            <div class="setting setting-action">
-              <button class="btn" onclick="saveSettings()">Save Settings</button>
             </div>
           </div>
         </section>
