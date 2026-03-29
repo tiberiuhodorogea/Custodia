@@ -6,6 +6,7 @@ Or via uvicorn:  uvicorn main:app --host 0.0.0.0 --port 8550
 """
 
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -18,6 +19,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 import database as db
 import backup_engine as engine
+
+log = logging.getLogger(__name__)
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -55,6 +58,10 @@ def refresh_scheduler():
             id="backup_job",
             replace_existing=True,
         )
+        log.info("Scheduler configured: every %d day(s) at %02d:%02d, next run: %s",
+                 freq, h, m, next_dt.strftime("%Y-%m-%d %H:%M"))
+    else:
+        log.info("Scheduler disabled")
 
 
 def get_next_run_time():
@@ -70,7 +77,9 @@ async def lifespan(app: FastAPI):
     db.init_db()
     refresh_scheduler()
     scheduler.start()
+    log.info("Application started")
     yield
+    log.info("Application shutting down")
     scheduler.shutdown(wait=False)
 
 
@@ -220,13 +229,16 @@ async def put_settings(body: SettingsBody):
 async def start_backup():
     ok = engine.start_backup_thread()
     if not ok:
+        log.warning("Backup start requested but one is already running")
         return {"ok": False, "error": "Backup already running"}
+    log.info("Manual backup started via dashboard")
     return {"ok": True}
 
 
 @app.post("/api/backup/cancel")
 async def cancel_backup():
     engine.cancel_backup()
+    log.info("Backup cancellation requested via dashboard")
     return {"ok": True}
 
 

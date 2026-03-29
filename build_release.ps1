@@ -132,6 +132,8 @@ setlocal
 set "INSTALL_DIR=$INSTALL_DIR"
 set "PY=%INSTALL_DIR%\python\python.exe"
 set "SVC=%INSTALL_DIR%\service.py"
+set "LOGDIR=%INSTALL_DIR%\logs"
+set "LOGFILE=%INSTALL_DIR%\logs\install.log"
 
 echo.
 echo ============================================================
@@ -155,10 +157,11 @@ if %errorlevel% equ 0 (
     echo   Previous installation found - removing it first...
     sc stop BackupService >nul 2>&1
     timeout /t 5 /nobreak >nul
-    "%PY%" "%SVC%" remove >nul 2>&1
+    if exist "%PY%" "%PY%" "%SVC%" remove >nul 2>&1
 )
 
 :: -- Copy files -----------------------------------------------------------
+:: Note: rmdir happens before any log file exists, so nothing is lost.
 echo   Copying files to %INSTALL_DIR% ...
 if exist "%INSTALL_DIR%" rmdir /s /q "%INSTALL_DIR%"
 xcopy /e /i /q "%~dp0" "%INSTALL_DIR%\" >nul
@@ -169,33 +172,55 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+:: -- Create logs dir and open install log (safe now - files are in place) -
+mkdir "%LOGDIR%" >nul 2>&1
+echo ============================================================ >> "%LOGFILE%"
+echo Install started : %DATE% %TIME%                              >> "%LOGFILE%"
+echo Machine         : %COMPUTERNAME%                             >> "%LOGFILE%"
+echo Source          : %~dp0                                      >> "%LOGFILE%"
+echo Destination     : %INSTALL_DIR%                              >> "%LOGFILE%"
+echo ============================================================ >> "%LOGFILE%"
+echo [%TIME%] Files copied to %INSTALL_DIR% >> "%LOGFILE%"
+
 :: -- Register Windows Service ---------------------------------------------
 echo   Registering Windows Service...
-"%INSTALL_DIR%\python\python.exe" "%INSTALL_DIR%\service.py" install
+echo [%TIME%] Registering Windows Service >> "%LOGFILE%"
+"%INSTALL_DIR%\python\python.exe" "%INSTALL_DIR%\service.py" install >> "%LOGFILE%" 2>&1
 if %errorlevel% neq 0 (
     echo   ERROR: Service registration failed.
-    echo   Check Event Viewer for details.
+    echo   Check: %LOGFILE%
+    echo [%TIME%] ERROR: Service registration failed (see above) >> "%LOGFILE%"
     echo.
     pause
     exit /b 1
 )
+echo [%TIME%] Service registered successfully >> "%LOGFILE%"
 
 :: -- Ensure auto-start on boot --------------------------------------------
 sc config BackupService start= auto >nul
+echo [%TIME%] Service set to auto-start >> "%LOGFILE%"
 
-:: -- Firewall rule ---------------------------------------------------------
+:: -- Firewall rule --------------------------------------------------------
 echo   Adding Windows Firewall rule for port 8550...
+echo [%TIME%] Adding firewall rule for port 8550 >> "%LOGFILE%"
 netsh advfirewall firewall delete rule name="BackupService Dashboard" >nul 2>&1
-netsh advfirewall firewall add rule name="BackupService Dashboard" dir=in action=allow protocol=TCP localport=8550 description="Backup Service web dashboard" >nul 2>&1
+netsh advfirewall firewall add rule name="BackupService Dashboard" dir=in action=allow protocol=TCP localport=8550 description="Backup Service web dashboard" >> "%LOGFILE%" 2>&1
 
 :: -- Start ----------------------------------------------------------------
 echo   Starting service...
-"%INSTALL_DIR%\python\python.exe" "%INSTALL_DIR%\service.py" start
+echo [%TIME%] Starting service >> "%LOGFILE%"
+"%INSTALL_DIR%\python\python.exe" "%INSTALL_DIR%\service.py" start >> "%LOGFILE%" 2>&1
 if %errorlevel% neq 0 (
     echo   WARNING: Service registered but did not start immediately.
-    echo   Try:  sc start BackupService
-    echo   Or check: Event Viewer ^> Windows Logs ^> Application
+    echo   Check: %LOGFILE%
+    echo   Or:    Event Viewer ^> Windows Logs ^> Application
+    echo [%TIME%] WARNING: Service start returned non-zero exit code >> "%LOGFILE%"
+) else (
+    echo [%TIME%] Service started successfully >> "%LOGFILE%"
 )
+
+echo [%TIME%] Install complete >> "%LOGFILE%"
+echo ============================================================ >> "%LOGFILE%"
 
 echo.
 echo ============================================================
@@ -203,6 +228,10 @@ echo   Installation complete!
 echo.
 echo   Dashboard : http://localhost:8550
 echo   LAN access: http://%COMPUTERNAME%:8550
+echo.
+echo   Logs folder: %LOGDIR%
+echo     install.log  - this install session
+echo     service.log  - runtime log (created on first service start)
 echo.
 echo   The service starts automatically on every boot.
 echo   To manage: Services (services.msc) ^> Backup Service
