@@ -2,7 +2,7 @@ import sqlite3
 import os
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backup_service.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custodia.db")
 
 
 def _connect():

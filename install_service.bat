@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo   Backup Service - Install
+echo   Custodia - Install
 echo ============================================
 echo.
 

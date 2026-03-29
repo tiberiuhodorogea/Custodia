@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Builds a self-contained release of Backup Service.
+    Builds a self-contained release of Custodia.
 
 .DESCRIPTION
     Run this ONCE on the development machine (internet required).
@@ -26,7 +26,7 @@ $PYTHON_EMBED_URL = "https://www.python.org/ftp/python/$PYTHON_VERSION/python-$P
 $GET_PIP_URL      = "https://bootstrap.pypa.io/get-pip.py"
 
 # Where install.bat will place the service on the TARGET machine
-$INSTALL_DIR = "C:\BackupService"
+$INSTALL_DIR = "C:\Custodia"
 
 # ---- Paths (on this build machine) ------------------------------------------
 $ROOT    = $PSScriptRoot
@@ -36,7 +36,7 @@ $PY_DIR  = Join-Path $RELEASE "python"
 # ---- Header -----------------------------------------------------------------
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host "  Backup Service - Build Release" -ForegroundColor Cyan
+Write-Host "  Custodia - Build Release" -ForegroundColor Cyan
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host "  Python : $PYTHON_VERSION ($PYTHON_ARCH)"
 Write-Host "  Output : $RELEASE"
@@ -117,7 +117,7 @@ $installBat = @"
 @echo off
 setlocal
 :: ============================================================
-::  Backup Service - Install
+::  Custodia - Install
 ::
 ::  Run this as Administrator.
 ::  Copies the service to $INSTALL_DIR, registers it as a
@@ -137,7 +137,7 @@ set "LOGFILE=%INSTALL_DIR%\logs\install.log"
 
 echo.
 echo ============================================================
-echo   Backup Service - Install
+echo   Custodia - Install
 echo ============================================================
 echo.
 
@@ -152,10 +152,10 @@ if %errorlevel% neq 0 (
 )
 
 :: -- Remove any previous installation ------------------------------------
-sc query BackupService >nul 2>&1
+sc query Custodia >nul 2>&1
 if %errorlevel% equ 0 (
     echo   Previous installation found - removing it first...
-    sc stop BackupService >nul 2>&1
+    sc stop Custodia >nul 2>&1
     timeout /t 5 /nobreak >nul
     if exist "%PY%" "%PY%" "%SVC%" remove >nul 2>&1
 )
@@ -187,7 +187,7 @@ echo   Registering Windows Service...
 echo [%TIME%] Registering Windows Service >> "%LOGFILE%"
 "%INSTALL_DIR%\python\python.exe" "%INSTALL_DIR%\service.py" install >> "%LOGFILE%" 2>&1
 :: Verify via sc query - more reliable than pywin32 exit code
-sc query BackupService >nul 2>&1
+sc query Custodia >nul 2>&1
 if %errorlevel% neq 0 (
     echo   ERROR: Service registration failed.
     echo   Check: %LOGFILE%
@@ -199,14 +199,14 @@ if %errorlevel% neq 0 (
 echo [%TIME%] Service registered and verified >> "%LOGFILE%"
 
 :: -- Ensure auto-start on boot --------------------------------------------
-sc config BackupService start= auto >nul
+sc config Custodia start= auto >nul
 echo [%TIME%] Service set to auto-start >> "%LOGFILE%"
 
 :: -- Firewall rule --------------------------------------------------------
 echo   Adding Windows Firewall rule for port 8550...
 echo [%TIME%] Adding firewall rule for port 8550 >> "%LOGFILE%"
-netsh advfirewall firewall delete rule name="BackupService Dashboard" >nul 2>&1
-netsh advfirewall firewall add rule name="BackupService Dashboard" dir=in action=allow protocol=TCP localport=8550 description="Backup Service web dashboard" >> "%LOGFILE%" 2>&1
+netsh advfirewall firewall delete rule name="Custodia Dashboard" >nul 2>&1
+netsh advfirewall firewall add rule name="Custodia Dashboard" dir=in action=allow protocol=TCP localport=8550 description="Custodia web dashboard" >> "%LOGFILE%" 2>&1
 
 :: -- Start ----------------------------------------------------------------
 echo   Starting service...
@@ -236,7 +236,7 @@ echo     install.log  - this install session
 echo     service.log  - runtime log (created on first service start)
 echo.
 echo   The service starts automatically on every boot.
-echo   To manage: Services (services.msc) ^> Backup Service
+echo   To manage: Services (services.msc) ^> Custodia
 echo ============================================================
 echo.
 pause
@@ -250,7 +250,7 @@ $uninstallBat = @"
 @echo off
 setlocal
 :: ============================================================
-::  Backup Service - Uninstall
+::  Custodia - Uninstall
 ::
 ::  Run this as Administrator.
 ::  Stops the service, removes its Windows registration,
@@ -263,7 +263,7 @@ set "INSTALL_DIR=$INSTALL_DIR"
 
 echo.
 echo ============================================================
-echo   Backup Service - Uninstall
+echo   Custodia - Uninstall
 echo ============================================================
 echo.
 
@@ -277,7 +277,7 @@ if %errorlevel% neq 0 (
 
 :: -- Stop service ---------------------------------------------------------
 echo   Stopping service...
-sc stop BackupService >nul 2>&1
+sc stop Custodia >nul 2>&1
 timeout /t 5 /nobreak >nul
 
 :: -- Remove service registration ------------------------------------------
@@ -285,12 +285,12 @@ echo   Removing service registration...
 if exist "%INSTALL_DIR%\python\python.exe" (
     "%INSTALL_DIR%\python\python.exe" "%INSTALL_DIR%\service.py" remove >nul 2>&1
 ) else (
-    sc delete BackupService >nul 2>&1
+    sc delete Custodia >nul 2>&1
 )
 
 :: -- Firewall rule --------------------------------------------------------
 echo   Removing firewall rule...
-netsh advfirewall firewall delete rule name="BackupService Dashboard" >nul 2>&1
+netsh advfirewall firewall delete rule name="Custodia Dashboard" >nul 2>&1
 
 :: -- Delete files ---------------------------------------------------------
 echo   Deleting %INSTALL_DIR% ...
@@ -304,7 +304,7 @@ if exist "%INSTALL_DIR%" (
 
 echo.
 echo ============================================================
-echo   Backup Service uninstalled.
+echo   Custodia uninstalled.
 echo   Your backup archives on destination drives are untouched.
 echo ============================================================
 echo.
@@ -316,8 +316,8 @@ $uninstallBat | Set-Content (Join-Path $RELEASE "uninstall.bat") -Encoding ASCII
 # ---- Write instructions.txt -------------------------------------------------
 Write-Host "       Writing instructions.txt..."
 $instructions = @"
-Backup Service
-==============
+Custodia
+========
 Automatic file backup service with a web dashboard accessible over LAN.
 
 
@@ -362,22 +362,22 @@ UNINSTALL
 1. Right-click uninstall.bat
 2. Select "Run as administrator"
 
-This removes the service and deletes C:\BackupService.
+This removes the service and deletes C:\Custodia.
 Your backup archives on destination drives are NOT touched.
 
 
 TROUBLESHOOT
 ------------
-- Dashboard not loading: open Services (services.msc), find "Backup Service", check its status
-- Service won't start: open Event Viewer > Windows Logs > Application and look for BackupService errors
+- Dashboard not loading: open Services (services.msc), find "Custodia", check its status
+- Service won't start: open Event Viewer > Windows Logs > Application and look for Custodia errors
 - Can't reach from another PC: make sure the firewall rule was added (install.bat does this automatically)
   To add it manually:
-    netsh advfirewall firewall add rule name="BackupService Dashboard" dir=in action=allow protocol=TCP localport=8550
+    netsh advfirewall firewall add rule name="Custodia Dashboard" dir=in action=allow protocol=TCP localport=8550
 "@
 $instructions | Set-Content (Join-Path $RELEASE "instructions.txt") -Encoding ASCII
 
 # ---- Zip the release --------------------------------------------------------
-$ZIP_PATH = Join-Path $ROOT "backup-service-release.zip"
+$ZIP_PATH = Join-Path $ROOT "custodia-release.zip"
 Write-Host "Zipping release..."
 if (Test-Path $ZIP_PATH) { Remove-Item $ZIP_PATH -Force }
 Compress-Archive -Path "$RELEASE\*" -DestinationPath $ZIP_PATH

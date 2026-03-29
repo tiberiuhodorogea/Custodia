@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo   Backup Service - Uninstall
+echo   Custodia - Uninstall
 echo ============================================
 echo.
 

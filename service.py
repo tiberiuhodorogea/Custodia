@@ -77,10 +77,10 @@ log = logging.getLogger(__name__)
 
 
 class BackupService(win32serviceutil.ServiceFramework):
-    _svc_name_ = "BackupService"
-    _svc_display_name_ = "Backup Service"
+    _svc_name_ = "Custodia"
+    _svc_display_name_ = "Custodia"
     _svc_description_ = (
-        "Automatic file backup service with web dashboard. "
+        "Custodia automatic backup service with web dashboard. "
         "Access at http://<hostname>:8550"
     )
 

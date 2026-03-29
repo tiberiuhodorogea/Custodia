@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="Backup Service", lifespan=lifespan)
+app = FastAPI(title="Custodia", lifespan=lifespan)
 
 # Serve static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
