@@ -113,32 +113,40 @@ async def index():
 
 
 # ── Folder browser ───────────────────────────────────────
-def _open_folder_dialog():
-    import subprocess
-    ps = (
-        "Add-Type -AssemblyName System.Windows.Forms;"
-        "$owner = New-Object System.Windows.Forms.Form;"
-        "$owner.TopMost = $true;"
-        "$owner.StartPosition = 'CenterScreen';"
-        "$owner.Width = 0; $owner.Height = 0;"
-        "$owner.Show();"
-        "$d = New-Object System.Windows.Forms.FolderBrowserDialog;"
-        "$d.ShowNewFolderButton = $true;"
-        "if ($d.ShowDialog($owner) -eq 'OK') { Write-Output $d.SelectedPath };"
-        "$owner.Dispose()"
-    )
-    result = subprocess.run(
-        ["powershell", "-NonInteractive", "-Command", ps],
-        capture_output=True, text=True, timeout=120,
-    )
-    return result.stdout.strip()
+@app.get("/api/browse")
+async def browse_folder(path: str = ""):
+    import string
+    from pathlib import Path
 
+    if not path:
+        drives = []
+        for letter in string.ascii_uppercase:
+            drive = f"{letter}:\\"
+            if os.path.exists(drive):
+                drives.append({"name": drive, "path": drive})
+        return {"path": "", "parent": None, "entries": drives}
 
-@app.post("/api/browse")
-async def browse_folder():
-    import asyncio
-    path = await asyncio.to_thread(_open_folder_dialog)
-    return {"path": path}
+    path = os.path.normpath(path)
+    if not os.path.isdir(path):
+        return {"path": path, "parent": None, "entries": []}
+
+    p = Path(path)
+    parent = str(p.parent)
+    if parent == path:
+        parent = ""
+
+    entries = []
+    try:
+        for entry in sorted(os.scandir(path), key=lambda e: e.name.lower()):
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    entries.append({"name": entry.name, "path": entry.path})
+            except OSError:
+                pass
+    except PermissionError:
+        pass
+
+    return {"path": path, "parent": parent, "entries": entries}
 
 
 # ── Status ──────────────────────────────────────────────

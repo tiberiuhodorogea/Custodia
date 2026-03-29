@@ -172,6 +172,21 @@
     </div><!-- /layout -->
   </main>
 
+  <!-- ── Folder browser modal ────────────────────────── -->
+  <div id="browse-overlay" class="browse-overlay" onclick="closeBrowseModal()"></div>
+  <div id="browse-modal" class="browse-modal" role="dialog" aria-modal="true">
+    <div class="browse-header">
+      <span class="browse-title">Browse</span>
+      <button class="icon-btn" onclick="closeBrowseModal()" title="Close">&times;</button>
+    </div>
+    <div class="browse-path" id="browse-path">&nbsp;</div>
+    <ul class="browse-list" id="browse-list"></ul>
+    <div class="browse-footer">
+      <button class="btn btn-sm btn-muted" onclick="closeBrowseModal()">Cancel</button>
+      <button class="btn btn-sm" onclick="confirmBrowse()">Select</button>
+    </div>
+  </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>

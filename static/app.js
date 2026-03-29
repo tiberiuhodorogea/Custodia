@@ -1,7 +1,6 @@
 /* ── State ──────────────────────────────────────────── */
 let ws = null;
 let reconnectTimer = null;
-let browseInFlight = false;
 const logLines = [];        // all log entries {level, message, timestamp}
 const MAX_LOG_LINES = 600;
 
@@ -141,22 +140,50 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 async function loadSources()  { renderPathList(await api('GET', '/api/sources'),      'source-list', 'src'); }
 async function loadDests()    { renderPathList(await api('GET', '/api/destinations'),  'dest-list',   'dst'); }
 
-async function browseSource() {
-  if (browseInFlight) return;
-  browseInFlight = true;
-  try {
-    const res = await api('POST', '/api/browse');
-    if (res.path) document.getElementById('src-path').value = res.path;
-  } finally { browseInFlight = false; }
+/* ── Folder browser modal ──────────────────────────── */
+let _browseTarget = null;   // input element that will receive the chosen path
+let _browseCurrent = '';    // currently displayed path
+
+function openBrowseModal(targetId) {
+  _browseTarget = document.getElementById(targetId);
+  document.getElementById('browse-overlay').classList.add('open');
+  document.getElementById('browse-modal').classList.add('open');
+  const seed = (_browseTarget && _browseTarget.value.trim()) || '';
+  browseTo(seed);
 }
-async function browseDest() {
-  if (browseInFlight) return;
-  browseInFlight = true;
-  try {
-    const res = await api('POST', '/api/browse');
-    if (res.path) document.getElementById('dst-path').value = res.path;
-  } finally { browseInFlight = false; }
+
+function closeBrowseModal() {
+  document.getElementById('browse-overlay').classList.remove('open');
+  document.getElementById('browse-modal').classList.remove('open');
 }
+
+function confirmBrowse() {
+  if (_browseTarget && _browseCurrent) _browseTarget.value = _browseCurrent;
+  closeBrowseModal();
+}
+
+async function browseTo(path) {
+  const url = '/api/browse' + (path ? '?path=' + encodeURIComponent(path) : '');
+  const res = await fetch(url).then(r => r.json());
+  _browseCurrent = res.path;
+
+  const pathEl = document.getElementById('browse-path');
+  const listEl = document.getElementById('browse-list');
+
+  pathEl.textContent = res.path || 'Select a drive';
+
+  const items = [];
+  if (res.parent !== null && res.parent !== undefined) {
+    items.push(`<li class="browse-item browse-up" onclick="browseTo(${JSON.stringify(res.parent)})">..</li>`);
+  }
+  items.push(...(res.entries || []).map(e =>
+    `<li class="browse-item" onclick="browseTo(${JSON.stringify(e.path)})">${esc(e.name)}</li>`
+  ));
+  listEl.innerHTML = items.join('') || '<li class="empty-msg" style="padding:.75rem">No subfolders</li>';
+}
+
+function browseSource() { openBrowseModal('src-path'); }
+function browseDest()   { openBrowseModal('dst-path'); }
 window.browseSource = browseSource;
 window.browseDest   = browseDest;
 
